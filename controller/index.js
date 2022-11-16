@@ -1,13 +1,13 @@
 const service = require('../service')
 const chalk = require('chalk');
-const { status } = require('../status');
+const { NotFound } = require('http-errors');
 
 const get = async (req, res, next) => {
   try {
-    const results = await service.getAllContacts()
+    const results = await service.getAllContacts(req.query)
     res.json({
       status: 'success',
-      code: status.OK,
+      code: 200,
       data: {
         contacts: results,
       },
@@ -21,39 +21,33 @@ const get = async (req, res, next) => {
 const getById = async (req, res, next) => {
   const { id } = req.params
   try {
-    const result = await service.getContactById(id)
-    if (result) {
+      const result = await service.getContactById(id);
       res.json({
         status: 'success',
-        code: status.OK,
+        code: 200,
         data: { contact: result },
       })
-    } else {
-      res.status(status.NOT_FOUND).json({
-        status: 'error',
-        code: status.NOT_FOUND,
-        message: `Not found contact id: ${id}`,
-        data: 'Not Found',
-      })
-    }
   } catch (e) {
-    console.error(chalk.red(e))
+  if (e.name === "CastError") {
+      next(NotFound(`Not found contact id`))
+  }
     next(e)
   }
 }
 
+// @TODO: Needs to refactor validation (using validation from mongoose Scheme)
 const create = async (req, res, next) => {
   const { name, email, phone, favorite = false } = req.body
   const isExistBody = Object.keys(req.body).length;
    if (!isExistBody) { 
-      res.status(status.BAD_REQUEST).json({ "message": "missing fields !" });
+      res.status(400).json({ "message": "missing fields !" });
       return;
     }
   try {
     const result = await service.createContact({ name, email, phone, favorite })
-    res.status(status.CREATED).json({
+    res.status(201).json({
       status: 'success',
-      code: status.CREATED,
+      code: 201,
       data: { contact: result },
     })
   } catch (e) {
@@ -62,12 +56,13 @@ const create = async (req, res, next) => {
   }
 }
 
+// @TODO: Needs to refactor validation (using validation from mongoose Scheme)
 const update = async (req, res, next) => {
   const { id } = req.params
   const { name, email, phone } = req.body
   const isExistBody = Object.keys(req.body).length;
    if (!isExistBody) { 
-      res.status(status.BAD_REQUEST).json({ "message": "missing fields !" });
+      res.status(400).json({ "message": "missing fields !" });
       return;
     }
   try {
@@ -75,7 +70,7 @@ const update = async (req, res, next) => {
     if (result) {
       res.json({
         status: 'success',
-        code: status.OK,
+        code: 200,
         data: { contact: result },
       })
     } else {
@@ -92,13 +87,14 @@ const update = async (req, res, next) => {
   }
 }
 
+// @TODO: Needs to refactor validation (using validation from mongoose Scheme)
 const updateStatus = async (req, res, next) => {
   const { id } = req.params
   const { favorite = false } = req.body
   const isExistBody = Object.keys(req.body).length;
   
   if (!isExistBody) { 
-    res.status(status.BAD_REQUEST).json({ "message": "missing field favorite" });
+    res.status(400).json({ "message": "missing field favorite" });
     return;
   }
   try {
@@ -106,13 +102,13 @@ const updateStatus = async (req, res, next) => {
     if (result) {
       res.json({
         status: 'success',
-        code: status.OK,
+        code: 200,
         data: { contact: result },
       })
     } else {
-      res.status(status.NOT_FOUND).json({
+      res.status(404).json({
         status: 'error',
-        code: status.NOT_FOUND,
+        code: 404,
         message: `Not found contact id: ${id}`,
         data: 'Not Found',
       })
@@ -123,6 +119,7 @@ const updateStatus = async (req, res, next) => {
   }
 }
 
+// @TODO: Needs to refactor validation (using validation from mongoose Scheme)
 const remove = async (req, res, next) => {
   const { id } = req.params
 
@@ -131,13 +128,13 @@ const remove = async (req, res, next) => {
     if (result) {
       res.json({
         status: 'success',
-        code: status.OK,
+        code: 200,
         data: { contact: result },
       })
     } else {
-      res.status(status.NOT_FOUND).json({
+      res.status(404).json({
         status: 'error',
-        code: status.NOT_FOUND,
+        code: 404,
         message: `Not found contact id: ${id}`,
         data: 'Not Found',
       })
