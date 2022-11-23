@@ -17,7 +17,8 @@ const users = new Schema({
     enum: ["starter", "pro", "business"],
     default: "starter"
   },
-  token: String
+  token: String,
+  avatarURL: String
 });
 
 users.methods.setPassword = function(password) {
