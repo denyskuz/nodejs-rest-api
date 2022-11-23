@@ -74,8 +74,6 @@ router.post('/login', async (req, res, next) => {
   try { 
     await loginSchema.validateAsync(req.body);
     const user = await User.findOne({ email })
-    console.log('ueserrrr=>>>>', user); 
-    console.log('user.validPassword(password)=>>>>', user.validPassword(password));
     if (!user || !user.validPassword(password)) {
         throw new Unauthorized("Incorrect login or password");
     }
