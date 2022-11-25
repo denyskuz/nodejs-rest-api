@@ -2,20 +2,21 @@ const express = require('express');
 const logger = require('morgan');
 const cors = require('cors');
 const s = require('chalk');
-
+const path = require('path');
 require('dotenv').config();
 
 
 const contactsRouter = require('./routes/api/contacts')
 const authRouter = require("./routes/api/users");
-
 const app = express()
-
 const formatsLogger = process.env.NODE_ENV === 'development' ? 'dev' : 'short'
 
 app.use(logger(formatsLogger))
 app.use(cors())
 app.use(express.json())
+app.use(express.static(path.join(__dirname, 'public')));
+
+
 require('./config/config-passport')
 
 app.use("/api/users", authRouter);
@@ -43,4 +44,6 @@ app.use((err, req, res, next) => {
 
 })
 
-module.exports = app
+module.exports = {
+  app
+}

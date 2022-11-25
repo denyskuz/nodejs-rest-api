@@ -5,6 +5,12 @@ const User = require('../../service/schemas/users');
 const Joi = require('joi');
 const auth = require('../../middleware/auth');
 const { Conflict, Unauthorized } = require('http-errors');
+const gravatar = require('gravatar');
+const multer = require('multer');
+const path = require('path');
+const { nanoid } = require('nanoid');
+const fs = require('fs/promises');
+const jimp = require('jimp');
 
 require('dotenv').config()
 const secret = process.env.SECRET
@@ -19,11 +25,29 @@ const loginSchema = Joi.object({
   email: Joi.string().required(),
 });
 
+const uploadDir = path.join(__dirname, '../../tmp');
+const storeImage = path.join(__dirname, '../../public/avatars');
+
+const storage = multer.diskStorage({
+  destination: uploadDir,
+  filename: (req, file, cb) => {
+    cb(null, nanoid() + file.originalname);
+  },
+  limits: {
+    fileSize: 1048576,
+  },
+});
+
+const upload = multer({
+  storage: storage,
+});
+
 router.post('/registration', async (req, res, next) => {
   const { subscription, email, password } = req.body
   try {
     await registrationSchema.validateAsync(req.body);   
-    const newUser = new User({ subscription, email })
+    const url = gravatar.url(email, {s: '250', r: 'x', d: 'retro'},  false);
+    const newUser = new User({ subscription, email, avatarURL: url })
     newUser.setPassword(password)
     await newUser.save()
     res.status(201).json({
@@ -93,6 +117,7 @@ router.post('/logout', auth, async (req, res, next) => {
     next(error)
   }
 })
+
 router.get('/current', auth, async (req, res, next) => {
   try {
     const { user } = req;
@@ -127,6 +152,38 @@ router.patch('/', auth, async (req, res, next) => {
       })
    } catch (error) {
     next(error)
+  }
+})
+
+router.patch('/avatars', auth, upload.single('avatar'), async (req, res, next) => {
+  const { path: temporaryName, filename } = req.file;
+  const { user } = req;
+  const fileName = path.join(storeImage, filename);
+  try {
+    const image = await jimp.read(temporaryName);
+    // Resize the image to width 150 and auto height.
+    await image.resize(250, 250);
+    // Save and overwrite the image
+    await image.writeAsync(temporaryName);
+    await fs.rename(temporaryName, fileName);
+    const imagePath = "/public/images/" + filename;
+
+    await User.findByIdAndUpdate(user._id, { avatarURL: imagePath }, { new: true });
+     res.status(200).json({
+        status: 'success',
+        code: 200,
+        data: {
+          file: imagePath   
+        },
+      })
+  } catch (error) {
+    if (req.file) { 
+      await fs.unlink(req.file.path);
+    }
+   console.error("Got error:", error.name, error.message);
+    return res.status(500).json({
+      error: error.message,
+    });
   }
 })
 module.exports = router;
