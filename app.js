@@ -11,10 +11,12 @@ const authRouter = require("./routes/api/users");
 const app = express()
 const formatsLogger = process.env.NODE_ENV === 'development' ? 'dev' : 'short'
 
-app.use(express.static(path.join(__dirname, 'public')));
 app.use(logger(formatsLogger))
 app.use(cors())
 app.use(express.json())
+app.use(express.static(path.join(__dirname, 'public')));
+
+
 require('./config/config-passport')
 
 app.use("/api/users", authRouter);
