@@ -18,7 +18,15 @@ const users = new Schema({
     default: "starter"
   },
   token: String,
-  avatarURL: String
+  avatarURL: String,
+  verify: {
+    type: Boolean,
+    default: false,
+  },
+  verificationToken: {
+    type: String,
+    required: [true, 'Verify token is required'],
+  },
 });
 
 users.methods.setPassword = function(password) {

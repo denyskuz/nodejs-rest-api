@@ -4,16 +4,20 @@ const jwt = require('jsonwebtoken');
 const User = require('../../service/schemas/users');
 const Joi = require('joi');
 const auth = require('../../middleware/auth');
-const { Conflict, Unauthorized } = require('http-errors');
+const { Conflict, Unauthorized, NotFound, BadRequest } = require('http-errors');
 const gravatar = require('gravatar');
 const multer = require('multer');
 const path = require('path');
 const { nanoid } = require('nanoid');
 const fs = require('fs/promises');
 const jimp = require('jimp');
+const sendGrid = require("@sendgrid/mail");
 
 require('dotenv').config()
 const secret = process.env.SECRET
+const { SEND_GRID_API_KEY } = process.env;
+
+sendGrid.setApiKey(SEND_GRID_API_KEY);
 
 const registrationSchema = Joi.object({
   password: Joi.string().min(6).required(),
@@ -22,6 +26,9 @@ const registrationSchema = Joi.object({
 });
 const loginSchema = Joi.object({
   password: Joi.string().min(6).required(),
+  email: Joi.string().required(),
+});
+const emailSchema = Joi.object({
   email: Joi.string().required(),
 });
 
@@ -44,12 +51,21 @@ const upload = multer({
 
 router.post('/registration', async (req, res, next) => {
   const { subscription, email, password } = req.body
+  const verificationToken = nanoid();
   try {
     await registrationSchema.validateAsync(req.body);   
     const url = gravatar.url(email, {s: '250', r: 'x', d: 'retro'},  false);
-    const newUser = new User({ subscription, email, avatarURL: url })
+    const newUser = new User({ subscription, email, avatarURL: url, verificationToken })
     newUser.setPassword(password)
     await newUser.save()
+    const sendEmail = {
+      from: "denis.kuz96@gmail.com",
+      to: email,
+      subject: "confirmation Email",
+      html: `<a target="_blank" href="http://localhost:3000/api/users/verify/:${verificationToken}">Verify Email</a>`,
+    };
+    await sendGrid.send(sendEmail);
+
     res.status(201).json({
         status: 'success',
         code: 201,
@@ -186,4 +202,44 @@ router.patch('/avatars', auth, upload.single('avatar'), async (req, res, next) =
     });
   }
 })
+router.get("/verify/:verificationToken", async (req, res, next) => {
+  try {
+    const { verificationToken } = req.params;
+    const user = await User.findOne({ verificationToken });
+    if (!user) {
+      throw new NotFound("User not found")
+    }
+    await User.findByIdAndUpdate(user._id, {
+      verificationToken: "",
+      verify: true,
+    });
+    res.status(200).json({ message: "Verification successful" });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/verify", async (req, res, next) => {
+  try {
+    await emailSchema.validateAsync(req.body);
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user || user.verify) {
+      throw BadRequest("Verification has already been passed");
+    }
+    const sendEmail = {
+      from: "denis.kuz96@gmail.com",
+      to: email,
+      subject: "Site registration confirmation",
+      html: `<a target="_blank" href="http://localhost:3000/api/users/:${user.verificationToken}">Verify Email</a>`,
+    };
+    await sendGrid.send(sendEmail);
+    res.status(200).json({
+      message: "Verification email sent",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;
